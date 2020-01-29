@@ -170,6 +170,12 @@ bool OpenComPort(const char *pszComPort)
   {
     int flags = fcntl(fdCom, F_GETFL, 0);
     fcntl(fdCom, F_SETFL, flags | O_NONBLOCK);
+    
+    struct termios tio;
+    tcgetattr(fdCom, &tio);
+    cfmakeraw(&tio);
+    tcsetattr(fdCom, TCSANOW, &tio);
+    
     bComPortOpen = true;
   }
   return bComPortOpen;
@@ -178,6 +184,7 @@ bool OpenComPort(const char *pszComPort)
 void CloseCom(void)
 {
   close(fdCom);
+  fdCom = -1;
 }
 
 ssize_t WriteCom(char *pBuffer, uint32_t uLen)
@@ -317,7 +324,8 @@ bool ResetIfNeeded(const char *pszComPort)
     // need to reset 32blit
     char rstCommand[] = "32BL_RST";
     WriteCom(rstCommand, (uint32_t)strlen(rstCommand));
-
+    CloseCom();
+    
     // wait for reconnect
     bool bReconnected = false;
     while (!bReconnected)
