@@ -63,7 +63,7 @@ void CloseCom(void)
   CloseHandle(hComm);
 }
 
-bool OpenComPort(const char *pszComPort)
+bool OpenComPort(const char *pszComPort, bool bTestConnection = false)
 {
   bWaitingOnRx = false;
 
@@ -159,41 +159,24 @@ void usleep(uint32_t uSecs)
 #else
 
 int fdCom = -1;
-bool OpenComPort(const char *pszComPort)
-{
-  bool bComPortOpen = false;
-  if (fdCom != -1)
-    close(fdCom);
-
-  fdCom = open(pszComPort, O_RDWR | O_NOCTTY | O_SYNC);
-  if (fdCom >= 0)
-  {
-    int flags = fcntl(fdCom, F_GETFL, 0);
-    fcntl(fdCom, F_SETFL, flags | O_NONBLOCK);
-    
-    struct termios tio;
-    tcgetattr(fdCom, &tio);
-    cfmakeraw(&tio);
-    tcsetattr(fdCom, TCSANOW, &tio);
-    
-    bComPortOpen = true;
-  }
-  return bComPortOpen;
-}
-
-void CloseCom(void)
-{
-  close(fdCom);
-  fdCom = -1;
-}
 
 ssize_t WriteCom(char *pBuffer, uint32_t uLen)
 {
-  ssize_t nWritten = write(fdCom, pBuffer, uLen);
-  if (nWritten > 0)
-    tcdrain(fdCom);
+	uint32_t uRemaining = uLen;
+	bool bError = false;
+	while (!bError && uRemaining)
+	{
+		ssize_t nWritten = write(fdCom, pBuffer+(uLen - uRemaining), uRemaining);
+		if (nWritten == -1)
+			bError = true;
+		else
+			uRemaining -= nWritten;
+	}
 
-  return nWritten;
+	if(!bError)
+		tcdrain(fdCom);
+
+  return uLen - uRemaining;;
 }
 
 bool GetRXByte(char &rxByte)
@@ -226,7 +209,7 @@ bool WaitForHeader(void)
   char    header[] = "32BL";
   uint8_t uHeaderPos = 0;
 
-  clock_t uTimeoutClk = CLOCKS_PER_SEC + clock();
+  clock_t uTimeoutClk = CLOCKS_PER_SEC*1 + clock();
 
   while (!bHeaderFound && !bTimedOut)
   {
@@ -280,12 +263,55 @@ bool Get32BlitInfo(uint32_t &uAck)
   bool bResult = false;
 
   char rstCommand[] = "32BLINFO";
-  WriteCom(rstCommand, (uint32_t)strlen(rstCommand));
+  ssize_t res = WriteCom(rstCommand, 8);
+  if(res != 8)
+  {
+	  int shit =errno;
+	  printf("errno=%d\n", shit);
+  }
+
   if (WaitForHeader())
     bResult = GetFourCC(uAck);
 
   return bResult;
 }
+
+void CloseCom(void)
+{
+  close(fdCom);
+  fdCom = -1;
+}
+
+bool OpenComPort(const char *pszComPort, bool bTestConnection = false)
+{
+  bool bComPortOpen = false;
+  if (fdCom != -1)
+    close(fdCom);
+
+  fdCom = open(pszComPort, O_RDWR | O_NOCTTY | O_SYNC);
+  if (fdCom >= 0)
+  {
+    int flags = fcntl(fdCom, F_GETFL, 0);
+    fcntl(fdCom, F_SETFL, flags | O_NONBLOCK);
+
+    struct termios tio;
+    tcgetattr(fdCom, &tio);
+    cfmakeraw(&tio);
+    tcsetattr(fdCom, TCSANOW, &tio);
+
+    if(bTestConnection)
+    {
+    	uint32_t uAck;
+    	bComPortOpen = Get32BlitInfo(uAck);
+    	if(!bComPortOpen)
+    		CloseCom();
+    }
+    else
+    	bComPortOpen = true;
+  }
+  return bComPortOpen;
+}
+
 
 bool ResetIfNeeded(const char *pszComPort)
 {
@@ -325,13 +351,13 @@ bool ResetIfNeeded(const char *pszComPort)
     char rstCommand[] = "32BL_RST";
     WriteCom(rstCommand, (uint32_t)strlen(rstCommand));
     CloseCom();
-    
+
     // wait for reconnect
     bool bReconnected = false;
     while (!bReconnected)
     {
       usleep(250000);
-      bReconnected = OpenComPort(pszComPort);
+      bReconnected = OpenComPort(pszComPort, true);
     }
     printf("Reconnected to 32Blit after reset.\n");
   }
@@ -423,7 +449,7 @@ int main(int argc, char *argv[])
           sprintf(header, "32BL%s%s%c%ld%c", pszProcess, pszBinFile, '*', nSize, '*');
           size_t uLen = strlen(header);
           sprintf(header, "32BL%s%s%c%ld%c", pszProcess, pszBinFile, 0, nSize, 0);
-          if (WriteCom(header, (uint32_t)uLen) != uLen)
+          if (WriteCom(header, (uint32_t)uLen) != (ssize_t)uLen)
           {
             printf("Error: Failed to write header to 32Blit.\n");
           }
@@ -435,7 +461,6 @@ int main(int argc, char *argv[])
             long nTotalWritten = 0;
             long nTotalRead = 0;
             uint32_t uProgressCount = 20;
-            bool bLogRx = false;
             while (!bFinishedTX)
             {
               // TX
@@ -444,7 +469,7 @@ int main(int argc, char *argv[])
               if (uRead)
               {
                 ssize_t nWritten = WriteCom(buffer, (uint32_t)uRead);
-                if (nWritten == uRead)
+                if (nWritten == (ssize_t)uRead)
                   nTotalWritten += nWritten;
                 else
                 {
@@ -482,6 +507,11 @@ int main(int argc, char *argv[])
                 {
                   usleep(250000);
                   bReconnected = OpenComPort(pszComPort);
+                  if(bReconnected)
+                  {
+                  	uint32_t uAck;
+                  	bReconnected = Get32BlitInfo(uAck);
+                  }
                 }
                 printf("Connected to 32Blit.\n");
 
