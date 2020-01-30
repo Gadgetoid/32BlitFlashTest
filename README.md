@@ -18,12 +18,12 @@ If you have no *.bin files you should see "No files found." displayed.
 
 ## Info
 
-Currently we have OSX and Windows version of the application used to send commands to the 32Blit, Linux is coming...
-
-In the following examples my 32Blit is attached to /dev/cu.usbmodem305B395634371 on OSX and COM3 on Windows.
+In the following examples my 32Blit is attached to /dev/cu.usbmodem305B395634371 on OSX, COM3 on Windows and /dev/serial/by-id/usb-STMicroelectronics_32Blit_CDC_305B39563437-if00 on Linux..
 All commands are from the root of this repository.
 The Bin folder contains the examples built to run from external flash.
 
+On Linux there may be a chance that the device file changes for your Blit32, so maybe between ttyACM0 and ttyACM1 for example.
+You can use the device file in /dev/serial/by-id/ instead as this will not change.
 
 ## Reseting the 32Blit
 
@@ -32,6 +32,10 @@ To reset the 32Blit we send the _RST command:
 So for OSX: 
 ```
 ./OSX/32Blit _RST /dev/cu.usbmodem305B395634371
+```
+Linux: 
+```
+./Linux/32Blit _RST /dev/serial/by-id/usb-STMicroelectronics_32Blit_CDC_305B39563437-if00
 ```
 Windows : 
 ```
@@ -45,6 +49,10 @@ To save a bin file to the SDcard we use the SAVE command:
 So for OSX: 
 ```
 ./OSX/32Blit SAVE /dev/cu.usbmodem305B395634371 Bins/logo.bin
+```
+Linux: 
+```
+./Linux/32Blit SAVE /dev/serial/by-id/usb-STMicroelectronics_32Blit_CDC_305B39563437-if00 Bins/logo.bin
 ```
 Windows : 
 ```
@@ -68,6 +76,10 @@ Now that the Logo app is running, lets try saving another file:
 So for OSX: 
 ```
 ./OSX/32Blit SAVE /dev/cu.usbmodem305B395634371 Bins/hardware-test.bin
+```
+So for Linux: 
+```
+./Linux/32Blit SAVE /dev/serial/by-id/usb-STMicroelectronics_32Blit_CDC_305B39563437-if00 Bins/hardware-test.bin
 ```
 Windows : 
 ```
@@ -98,6 +110,10 @@ This command after programming will keep the com port open to display any
 So for OSX: 
 ```
 /OSX/32Blit PROG /dev/cu.usbmodem305B395634371 Bins/logo.bin
+```
+Linux: 
+```
+/Linux/32Blit PROG /dev/serial/by-id/usb-STMicroelectronics_32Blit_CDC_305B39563437-if00 Bins/logo.bin
 ```
 Windows : 
 ```
