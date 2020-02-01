@@ -23,6 +23,8 @@ struct FourCCMake
   static const unsigned int value = (((((d << 8) | c) << 8) | b) << 8) | a;
 };
 
+bool Get32BlitInfo(uint32_t &uAck);
+
 void usage(void)
 {
   printf("Usage: 32blit <process> <comport> <binfile>\n");
@@ -166,14 +168,14 @@ ssize_t WriteCom(char *pBuffer, uint32_t uLen)
   bool bError = false;
   while (!bError && uRemaining)
   {
-    ssize_t nWritten = write(fdCom, pBuffer+(uLen - uRemaining), uRemaining);
+    ssize_t nWritten = write(fdCom, pBuffer + (uLen - uRemaining), uRemaining);
     if (nWritten == -1)
       bError = true;
     else
       uRemaining -= nWritten;
   }
 
-  if(!bError)
+  if (!bError)
     tcdrain(fdCom);
 
   return uLen - uRemaining;;
@@ -199,6 +201,42 @@ bool HandleRX(void)
   return bResult;
 }
 
+void CloseCom(void)
+{
+  close(fdCom);
+  fdCom = -1;
+}
+
+bool OpenComPort(const char *pszComPort, bool bTestConnection = false)
+{
+  bool bComPortOpen = false;
+  if (fdCom != -1)
+    close(fdCom);
+
+  fdCom = open(pszComPort, O_RDWR | O_NOCTTY | O_SYNC);
+  if (fdCom >= 0)
+  {
+    int flags = fcntl(fdCom, F_GETFL, 0);
+    fcntl(fdCom, F_SETFL, flags | O_NONBLOCK);
+
+    struct termios tio;
+    tcgetattr(fdCom, &tio);
+    cfmakeraw(&tio);
+    tcsetattr(fdCom, TCSANOW, &tio);
+
+    if (bTestConnection)
+    {
+      uint32_t uAck;
+      bComPortOpen = Get32BlitInfo(uAck);
+      if (!bComPortOpen)
+        CloseCom();
+    }
+    else
+      bComPortOpen = true;
+  }
+  return bComPortOpen;
+}
+
 #endif
 
 bool WaitForHeader(void)
@@ -209,7 +247,7 @@ bool WaitForHeader(void)
   char    header[] = "32BL";
   uint8_t uHeaderPos = 0;
 
-  clock_t uTimeoutClk = CLOCKS_PER_SEC*1 + clock();
+  clock_t uTimeoutClk = CLOCKS_PER_SEC * 1 + clock();
 
   while (!bHeaderFound && !bTimedOut)
   {
@@ -264,9 +302,9 @@ bool Get32BlitInfo(uint32_t &uAck)
 
   char rstCommand[] = "32BLINFO";
   ssize_t res = WriteCom(rstCommand, 8);
-  if(res != 8)
+  if (res != 8)
   {
-    int shit =errno;
+    int shit = errno;
     printf("errno=%d\n", shit);
   }
 
@@ -276,41 +314,6 @@ bool Get32BlitInfo(uint32_t &uAck)
   return bResult;
 }
 
-void CloseCom(void)
-{
-  close(fdCom);
-  fdCom = -1;
-}
-
-bool OpenComPort(const char *pszComPort, bool bTestConnection = false)
-{
-  bool bComPortOpen = false;
-  if (fdCom != -1)
-    close(fdCom);
-
-  fdCom = open(pszComPort, O_RDWR | O_NOCTTY | O_SYNC);
-  if (fdCom >= 0)
-  {
-    int flags = fcntl(fdCom, F_GETFL, 0);
-    fcntl(fdCom, F_SETFL, flags | O_NONBLOCK);
-
-    struct termios tio;
-    tcgetattr(fdCom, &tio);
-    cfmakeraw(&tio);
-    tcsetattr(fdCom, TCSANOW, &tio);
-
-    if(bTestConnection)
-    {
-      uint32_t uAck;
-      bComPortOpen = Get32BlitInfo(uAck);
-      if(!bComPortOpen)
-        CloseCom();
-    }
-    else
-      bComPortOpen = true;
-  }
-  return bComPortOpen;
-}
 
 
 bool ResetIfNeeded(const char *pszComPort)
@@ -507,7 +510,7 @@ int main(int argc, char *argv[])
                 {
                   usleep(250000);
                   bReconnected = OpenComPort(pszComPort);
-                  if(bReconnected)
+                  if (bReconnected)
                   {
                     uint32_t uAck;
                     bReconnected = Get32BlitInfo(uAck);
