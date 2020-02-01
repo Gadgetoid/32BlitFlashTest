@@ -25,7 +25,7 @@ struct FourCCMake
 
 void usage(void)
 {
-  printf("Usage: 32blit <process> <binfile> <comport>\n");
+  printf("Usage: 32blit <process> <comport> <binfile>\n");
   printf("  <process> : Either _RST, SAVE or PROG\n");
   printf("  <comport> : Com port, eg COM1 or /dev/cu.usbmodem\n");
   printf("  <binfile> : Bin file path (optional, needed for SAVE and PROG)\n");
@@ -162,19 +162,19 @@ int fdCom = -1;
 
 ssize_t WriteCom(char *pBuffer, uint32_t uLen)
 {
-	uint32_t uRemaining = uLen;
-	bool bError = false;
-	while (!bError && uRemaining)
-	{
-		ssize_t nWritten = write(fdCom, pBuffer+(uLen - uRemaining), uRemaining);
-		if (nWritten == -1)
-			bError = true;
-		else
-			uRemaining -= nWritten;
-	}
+  uint32_t uRemaining = uLen;
+  bool bError = false;
+  while (!bError && uRemaining)
+  {
+    ssize_t nWritten = write(fdCom, pBuffer+(uLen - uRemaining), uRemaining);
+    if (nWritten == -1)
+      bError = true;
+    else
+      uRemaining -= nWritten;
+  }
 
-	if(!bError)
-		tcdrain(fdCom);
+  if(!bError)
+    tcdrain(fdCom);
 
   return uLen - uRemaining;;
 }
@@ -266,8 +266,8 @@ bool Get32BlitInfo(uint32_t &uAck)
   ssize_t res = WriteCom(rstCommand, 8);
   if(res != 8)
   {
-	  int shit =errno;
-	  printf("errno=%d\n", shit);
+    int shit =errno;
+    printf("errno=%d\n", shit);
   }
 
   if (WaitForHeader())
@@ -301,13 +301,13 @@ bool OpenComPort(const char *pszComPort, bool bTestConnection = false)
 
     if(bTestConnection)
     {
-    	uint32_t uAck;
-    	bComPortOpen = Get32BlitInfo(uAck);
-    	if(!bComPortOpen)
-    		CloseCom();
+      uint32_t uAck;
+      bComPortOpen = Get32BlitInfo(uAck);
+      if(!bComPortOpen)
+        CloseCom();
     }
     else
-    	bComPortOpen = true;
+      bComPortOpen = true;
   }
   return bComPortOpen;
 }
@@ -509,8 +509,8 @@ int main(int argc, char *argv[])
                   bReconnected = OpenComPort(pszComPort);
                   if(bReconnected)
                   {
-                  	uint32_t uAck;
-                  	bReconnected = Get32BlitInfo(uAck);
+                    uint32_t uAck;
+                    bReconnected = Get32BlitInfo(uAck);
                   }
                 }
                 printf("Connected to 32Blit.\n");
@@ -562,4 +562,3 @@ int main(int argc, char *argv[])
 
   exit(0);
 }
-
